@@ -144,7 +144,7 @@ steps:
     env:
       VSCODE_ARCH: "$(VSCODE_ARCH)"
     displayName: Download Explorer Sparse Package
-    condition: and(succeeded(), eq(variables['VSCODE_STEP_ON_IT'], 'false'))
+    condition: and(succeeded(), ne(variables['VSCODE_PUBLISH'], 'false'))
 
   - powershell: |
       . build/azure-pipelines/win32/exec.ps1
@@ -386,7 +386,8 @@ steps:
     - powershell: |
         . build/azure-pipelines/win32/exec.ps1
         $ErrorActionPreference = "Stop"
-        exec { node build\azure-pipelines\common\sign $env:EsrpCliDllPath windows $(ESRP-PKI) $(esrp-aad-username) $(esrp-aad-password) $(CodeSigningFolderPath) '*.dll,*.exe,*.node,*.appx' }
+        exec { node build\azure-pipelines\common\sign $env:EsrpCliDllPath windows $(ESRP-PKI) $(esrp-aad-username) $(esrp-aad-password) $(CodeSigningFolderPath) '*.dll,*.exe,*.node' }
+        exec { node build\azure-pipelines\common\sign $env:EsrpCliDllPath windows-noappend $(ESRP-PKI) $(esrp-aad-username) $(esrp-aad-password) $(CodeSigningFolderPath) '*.appx' }
       displayName: Codesign
       condition: and(succeeded(), ne(variables['VSCODE_PUBLISH'], 'false'))
 
