@@ -331,12 +331,14 @@ function packageTask(platform, arch, sourceFolderName, destinationFolderName, op
 			result = es.merge(result, gulp.src('resources/win32/VisualElementsManifest.xml', { base: 'resources/win32' })
 				.pipe(rename(product.nameShort + '.VisualElementsManifest.xml')));
 
-			const appxPackagePrefix = quality === 'insider' ? 'code_insiders' : 'code';
-			let appxPackage = `${appxPackagePrefix}_explorer_${arch}.appx`;
-			if (arch === 'ia32') {
-				appxPackage = `${appxPackagePrefix}_explorer_x86.appx`;
+			if (quality) {
+				const appxPackagePrefix = quality === 'insider' ? 'code_insiders' : 'code';
+				let appxPackage = `${appxPackagePrefix}_explorer_${arch}.appx`;
+				if (arch === 'ia32') {
+					appxPackage = `${appxPackagePrefix}_explorer_x86.appx`;
+				}
+				result = es.merge(result, gulp.src(`resources/win32/appx/${appxPackage}`, { base: 'resources/win32/appx' }));
 			}
-			result = es.merge(result, gulp.src(`resources/win32/appx/${appxPackage}`, { base: 'resources/win32/appx' }));
 
 		} else if (platform === 'linux') {
 			result = es.merge(result, gulp.src('resources/linux/bin/code.sh', { base: '.' })
