@@ -4,11 +4,11 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { IRange } from 'vs/editor/common/core/range';
-import { ICodeEditorViewState, IDiffEditorViewState, IEditor, ScrollType } from 'vs/editor/common/editorCommon';
+import { ICodeEditorViewState, IDiffEditorViewState, ScrollType } from 'vs/editor/common/editorCommon';
 import { ITextEditorOptions, TextEditorSelectionRevealType, TextEditorSelectionSource } from 'vs/platform/editor/common/editor';
-import { isTextEditorViewState } from 'vs/workbench/common/editor';
+import { isTextEditorViewState, ITextEditorControl } from 'vs/workbench/common/editor';
 
-export function applyTextEditorOptions(options: ITextEditorOptions, editor: IEditor, scrollType: ScrollType): boolean {
+export function applyTextEditorOptions(options: ITextEditorOptions, editor: ITextEditorControl, scrollType: ScrollType): boolean {
 	let applied = false;
 
 	// Restore view state if any

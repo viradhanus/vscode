@@ -9,7 +9,7 @@ import { isObject, isArray, assertIsDefined, withUndefinedAsNull, withNullAsUnde
 import { IDiffEditor, isDiffEditor } from 'vs/editor/browser/editorBrowser';
 import { IDiffEditorOptions, IEditorOptions as ICodeEditorOptions } from 'vs/editor/common/config/editorOptions';
 import { BaseTextEditor, IEditorConfiguration } from 'vs/workbench/browser/parts/editor/textEditor';
-import { TEXT_DIFF_EDITOR_ID, IEditorFactoryRegistry, EditorExtensions, ITextDiffEditorPane, IEditorOpenContext, EditorInputCapabilities, isEditorInput, isTextEditorViewState } from 'vs/workbench/common/editor';
+import { TEXT_DIFF_EDITOR_ID, IEditorFactoryRegistry, EditorExtensions, ITextDiffEditorPane, IEditorOpenContext, EditorInputCapabilities, isEditorInput, isTextEditorViewState, ITextEditorControl } from 'vs/workbench/common/editor';
 import { EditorInput } from 'vs/workbench/common/editor/editorInput';
 import { applyTextEditorOptions } from 'vs/workbench/common/editor/editorOptions';
 import { DiffEditorInput } from 'vs/workbench/common/editor/diffEditorInput';
@@ -47,14 +47,15 @@ export class TextDiffEditor extends BaseTextEditor<IDiffEditorViewState> impleme
 
 	private readonly inputListener = this._register(new MutableDisposable());
 
+	private diffEditorControl: IDiffEditor & ITextEditorControl | undefined = undefined;
+
 	override get scopedContextKeyService(): IContextKeyService | undefined {
-		const control = this.getControl();
-		if (!control) {
+		if (!this.diffEditorControl) {
 			return undefined;
 		}
 
-		const originalEditor = control.getOriginalEditor();
-		const modifiedEditor = control.getModifiedEditor();
+		const originalEditor = this.diffEditorControl.getOriginalEditor();
+		const modifiedEditor = this.diffEditorControl.getModifiedEditor();
 
 		return (originalEditor.hasTextFocus() ? originalEditor : modifiedEditor).invokeWithinContext(accessor => accessor.get(IContextKeyService));
 	}
@@ -89,13 +90,10 @@ export class TextDiffEditor extends BaseTextEditor<IDiffEditorViewState> impleme
 	}
 
 	private updateReadonly(input: DiffEditorInput): void {
-		const control = this.getControl();
-		if (control) {
-			control.updateOptions({
-				readOnly: input.modified.hasCapability(EditorInputCapabilities.Readonly),
-				originalEditable: !input.original.hasCapability(EditorInputCapabilities.Readonly)
-			});
-		}
+		this.diffEditorControl?.updateOptions({
+			readOnly: input.modified.hasCapability(EditorInputCapabilities.Readonly),
+			originalEditable: !input.original.hasCapability(EditorInputCapabilities.Readonly)
+		});
 	}
 
 	override getTitle(): string {
@@ -106,8 +104,10 @@ export class TextDiffEditor extends BaseTextEditor<IDiffEditorViewState> impleme
 		return localize('textDiffEditor', "Text Diff Editor");
 	}
 
-	override createEditorControl(parent: HTMLElement, configuration: ICodeEditorOptions): IDiffEditor {
-		return this.instantiationService.createInstance(DiffEditorWidget, parent, configuration, {});
+	override createEditorControl(parent: HTMLElement, configuration: ICodeEditorOptions): ITextEditorControl {
+		this.diffEditorControl = this.instantiationService.createInstance(DiffEditorWidget, parent, configuration, {});
+
+		return this.diffEditorControl;
 	}
 
 	override async setInput(input: DiffEditorInput, options: ITextEditorOptions | undefined, context: IEditorOpenContext, token: CancellationToken): Promise<void> {
@@ -136,7 +136,7 @@ export class TextDiffEditor extends BaseTextEditor<IDiffEditorViewState> impleme
 			}
 
 			// Set Editor Model
-			const diffEditor = assertIsDefined(this.getControl());
+			const diffEditor = assertIsDefined(this.diffEditorControl);
 			const resolvedDiffEditorModel = resolvedModel as TextDiffEditorModel;
 			diffEditor.setModel(withUndefinedAsNull(resolvedDiffEditorModel.textDiffEditorModel));
 
@@ -280,16 +280,15 @@ export class TextDiffEditor extends BaseTextEditor<IDiffEditorViewState> impleme
 		this.diffNavigatorDisposables.clear();
 
 		// Clear Model
-		const diffEditor = this.getControl();
-		diffEditor?.setModel(null);
+		this.diffEditorControl?.setModel(null);
 	}
 
 	getDiffNavigator(): DiffNavigator | undefined {
 		return this.diffNavigator;
 	}
 
-	override getControl(): IDiffEditor | undefined {
-		return super.getControl() as IDiffEditor | undefined;
+	override getControl(): ITextEditorControl & IDiffEditor | undefined {
+		return this.diffEditorControl;
 	}
 
 	protected override tracksEditorViewState(input: EditorInput): boolean {

@@ -8,7 +8,7 @@ import { Event } from 'vs/base/common/event';
 import { assertIsDefined } from 'vs/base/common/types';
 import { URI } from 'vs/base/common/uri';
 import { Disposable, IDisposable, toDisposable } from 'vs/base/common/lifecycle';
-import { ICodeEditorViewState, IDiffEditor, IDiffEditorViewState, IEditorViewState } from 'vs/editor/common/editorCommon';
+import { ICodeEditorViewState, IDiffEditor, IDiffEditorViewState, IEditorViewState, ScrollType } from 'vs/editor/common/editorCommon';
 import { IEditorOptions, IResourceEditorInput, ITextResourceEditorInput, IBaseTextResourceEditorInput, IBaseUntypedEditorInput } from 'vs/platform/editor/common/editor';
 import type { EditorInput } from 'vs/workbench/common/editor/editorInput';
 import { IInstantiationService, IConstructorSignature, ServicesAccessor, BrandedService } from 'vs/platform/instantiation/common/instantiation';
@@ -23,6 +23,8 @@ import { coalesce } from 'vs/base/common/arrays';
 import { IExtUri } from 'vs/base/common/resources';
 import { Schemas } from 'vs/base/common/network';
 import { IEditorService } from 'vs/workbench/services/editor/common/editorService';
+import { IEditorOptions as ICodeEditorOptions } from 'vs/editor/common/config/editorOptions';
+import { IRange } from 'vs/editor/common/core/range';
 
 // Static values for editor contributions
 export const EditorExtensions = {
@@ -333,7 +335,7 @@ export interface ITextDiffEditorPane extends IEditorPane {
 	/**
 	 * Returns the underlying text editor widget of this editor.
 	 */
-	getControl(): IDiffEditor | undefined;
+	getControl(): IDiffEditor & ITextEditorControl | undefined;
 }
 
 /**
@@ -1385,4 +1387,35 @@ export function isTextEditorViewState(candidate: unknown): candidate is IEditorV
 	const codeEditorViewState = viewState as ICodeEditorViewState;
 
 	return !!(codeEditorViewState.contributionsState && codeEditorViewState.viewState && Array.isArray(codeEditorViewState.cursorState));
+}
+
+/**
+ * A subset of the monaco `IEditor` interface to make it easier
+ * to use our basic workbench text editor pane with other editors
+ * such as the merge editor that is composed of multiple editors.
+ *
+ * If the control is composed of muliple text editor controls,
+ * the targt should be the dominant one (e.g. for diff editors the
+ * right hand side).
+ */
+export interface ITextEditorControl extends IDisposable {
+
+	revealRangeInCenter(range: IRange, scrollType: ScrollType): void;
+	revealRangeInCenterIfOutsideViewport(range: IRange, scrollType: ScrollType): void;
+	revealRangeNearTopIfOutsideViewport(range: IRange, scrollType: ScrollType): void;
+	revealRangeNearTop(range: IRange, scrollType: ScrollType): void;
+
+	setSelection(range: IRange, source: string): void;
+
+	restoreViewState(viewState: IEditorViewState): void;
+
+	updateOptions(options: ICodeEditorOptions): void;
+
+	onVisible(): void;
+	onHide(): void;
+
+	focus(): void;
+	hasTextFocus(): boolean;
+
+	layout(dimensions: { width: number; height: number }): void;
 }

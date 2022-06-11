@@ -9,7 +9,7 @@ import { distinct, deepClone } from 'vs/base/common/objects';
 import { Emitter, Event } from 'vs/base/common/event';
 import { isObject, assertIsDefined, withNullAsUndefined } from 'vs/base/common/types';
 import { Dimension } from 'vs/base/browser/dom';
-import { IEditorOpenContext, EditorInputCapabilities, IEditorPaneSelection, EditorPaneSelectionCompareResult, EditorPaneSelectionChangeReason, IEditorPaneWithSelection, IEditorPaneSelectionChangeEvent } from 'vs/workbench/common/editor';
+import { IEditorOpenContext, EditorInputCapabilities, IEditorPaneSelection, EditorPaneSelectionCompareResult, EditorPaneSelectionChangeReason, IEditorPaneWithSelection, IEditorPaneSelectionChangeEvent, ITextEditorControl } from 'vs/workbench/common/editor';
 import { applyTextEditorOptions } from 'vs/workbench/common/editor/editorOptions';
 import { EditorInput } from 'vs/workbench/common/editor/editorInput';
 import { computeEditorAriaLabel } from 'vs/workbench/browser/editor';
@@ -29,7 +29,7 @@ import { IEditorOptions as ICodeEditorOptions } from 'vs/editor/common/config/ed
 import { Selection } from 'vs/editor/common/core/selection';
 import { ICursorPositionChangedEvent } from 'vs/editor/common/cursorEvents';
 import { CodeEditorWidget } from 'vs/editor/browser/widget/codeEditorWidget';
-import { IEditorViewState, IEditor, ScrollType } from 'vs/editor/common/editorCommon';
+import { IEditorViewState, ScrollType } from 'vs/editor/common/editorCommon';
 import { isCodeEditor, getCodeEditor } from 'vs/editor/browser/editorBrowser';
 
 export interface IEditorConfiguration {
@@ -47,7 +47,7 @@ export abstract class BaseTextEditor<T extends IEditorViewState> extends Abstrac
 	protected readonly _onDidChangeSelection = this._register(new Emitter<IEditorPaneSelectionChangeEvent>());
 	readonly onDidChangeSelection = this._onDidChangeSelection.event;
 
-	private editorControl: IEditor | undefined;
+	private editorControl: ITextEditorControl | undefined;
 	private editorContainer: HTMLElement | undefined;
 	private hasPendingConfigurationChange: boolean | undefined;
 	private lastAppliedEditorOptions?: ICodeEditorOptions;
@@ -176,7 +176,7 @@ export abstract class BaseTextEditor<T extends IEditorViewState> extends Abstrac
 	 * The passed in configuration object should be passed to the editor
 	 * control when creating it.
 	 */
-	protected abstract createEditorControl(parent: HTMLElement, configuration: ICodeEditorOptions): IEditor;
+	protected abstract createEditorControl(parent: HTMLElement, configuration: ICodeEditorOptions): ITextEditorControl;
 
 	override async setInput(input: EditorInput, options: ITextEditorOptions | undefined, context: IEditorOpenContext, token: CancellationToken): Promise<void> {
 		await super.setInput(input, options, context, token);
@@ -235,7 +235,7 @@ export abstract class BaseTextEditor<T extends IEditorViewState> extends Abstrac
 		editorControl.layout(dimension);
 	}
 
-	override getControl(): IEditor | undefined {
+	override getControl(): ITextEditorControl | undefined {
 		return this.editorControl;
 	}
 
@@ -323,7 +323,7 @@ export abstract class BaseTextEditor<T extends IEditorViewState> extends Abstrac
  */
 export abstract class AbstractTextEditor<T extends IEditorViewState> extends BaseTextEditor<T> {
 
-	protected createEditorControl(parent: HTMLElement, configuration: ICodeEditorOptions): IEditor {
+	protected createEditorControl(parent: HTMLElement, configuration: ICodeEditorOptions): ITextEditorControl {
 		return this.instantiationService.createInstance(CodeEditorWidget, parent, { enableDropIntoEditor: true, ...configuration }, {});
 	}
 }
