@@ -49,8 +49,7 @@ export class BuiltinExtensionsScannerService implements IBuiltinExtensionsScanne
 						} catch (error) { /* ignore error*/ }
 					}
 				}
-				console.log(languagePackTranslationsService);
-				console.log(environmentService);
+
 				this.builtinExtensions = bundledExtensions.map(async e => {
 					const id = getGalleryExtensionId(e.packageJSON.publisher, e.packageJSON.name);
 					return {
