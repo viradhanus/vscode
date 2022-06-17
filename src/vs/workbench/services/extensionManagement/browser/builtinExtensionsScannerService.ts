@@ -10,7 +10,7 @@ import { IUriIdentityService } from 'vs/platform/uriIdentity/common/uriIdentity'
 import { registerSingleton } from 'vs/platform/instantiation/common/extensions';
 import { getGalleryExtensionId } from 'vs/platform/extensionManagement/common/extensionManagementUtil';
 import { FileAccess } from 'vs/base/common/network';
-import { localizeManifest } from 'vs/platform/extensionManagement/common/extensionNls';
+import { ILanguagePackTranslationsService } from 'vs/workbench/services/localization/common/languagePackTranslations';
 
 interface IBundledExtension {
 	extensionPath: string;
@@ -24,11 +24,12 @@ export class BuiltinExtensionsScannerService implements IBuiltinExtensionsScanne
 
 	declare readonly _serviceBrand: undefined;
 
-	private readonly builtinExtensions: IExtension[] = [];
+	private readonly builtinExtensions: Promise<IExtension>[] = [];
 
 	constructor(
 		@IWorkbenchEnvironmentService environmentService: IWorkbenchEnvironmentService,
 		@IUriIdentityService uriIdentityService: IUriIdentityService,
+		@ILanguagePackTranslationsService languagePackTranslationsService: ILanguagePackTranslationsService
 	) {
 		if (isWeb) {
 			const builtinExtensionsServiceUrl = FileAccess.asBrowserUri('../../../../../../extensions', require);
@@ -48,25 +49,29 @@ export class BuiltinExtensionsScannerService implements IBuiltinExtensionsScanne
 						} catch (error) { /* ignore error*/ }
 					}
 				}
-
-				this.builtinExtensions = bundledExtensions.map(e => ({
-					identifier: { id: getGalleryExtensionId(e.packageJSON.publisher, e.packageJSON.name) },
-					location: uriIdentityService.extUri.joinPath(builtinExtensionsServiceUrl!, e.extensionPath),
-					type: ExtensionType.System,
-					isBuiltin: true,
-					manifest: e.packageNLS ? localizeManifest(e.packageJSON, e.packageNLS) : e.packageJSON,
-					readmeUrl: e.readmePath ? uriIdentityService.extUri.joinPath(builtinExtensionsServiceUrl!, e.readmePath) : undefined,
-					changelogUrl: e.changelogPath ? uriIdentityService.extUri.joinPath(builtinExtensionsServiceUrl!, e.changelogPath) : undefined,
-					targetPlatform: TargetPlatform.WEB,
-					validations: [],
-					isValid: true
-				}));
+				console.log(languagePackTranslationsService);
+				console.log(environmentService);
+				this.builtinExtensions = bundledExtensions.map(async e => {
+					const id = getGalleryExtensionId(e.packageJSON.publisher, e.packageJSON.name);
+					return {
+						identifier: { id },
+						location: uriIdentityService.extUri.joinPath(builtinExtensionsServiceUrl!, e.extensionPath),
+						type: ExtensionType.System,
+						isBuiltin: true,
+						manifest: e.packageNLS ? await languagePackTranslationsService.localizeManifest(e.packageJSON, e.packageNLS) : e.packageJSON,
+						readmeUrl: e.readmePath ? uriIdentityService.extUri.joinPath(builtinExtensionsServiceUrl!, e.readmePath) : undefined,
+						changelogUrl: e.changelogPath ? uriIdentityService.extUri.joinPath(builtinExtensionsServiceUrl!, e.changelogPath) : undefined,
+						targetPlatform: TargetPlatform.WEB,
+						validations: [],
+						isValid: true
+					};
+				});
 			}
 		}
 	}
 
 	async scanBuiltinExtensions(): Promise<IExtension[]> {
-		return [...this.builtinExtensions];
+		return [...await Promise.all(this.builtinExtensions)];
 	}
 }
 

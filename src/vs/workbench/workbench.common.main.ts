@@ -78,6 +78,7 @@ import 'vs/workbench/services/label/common/labelService';
 import 'vs/workbench/services/extensions/common/extensionManifestPropertiesService';
 import 'vs/workbench/services/extensionManagement/browser/webExtensionsScannerService';
 import 'vs/workbench/services/extensionManagement/browser/extensionEnablementService';
+import 'vs/workbench/services/localization/browser/languagePackTranslationsService';
 import 'vs/workbench/services/extensionManagement/browser/builtinExtensionsScannerService';
 import 'vs/workbench/services/extensionRecommendations/common/extensionIgnoredRecommendationsService';
 import 'vs/workbench/services/extensionRecommendations/common/workspaceExtensionsConfig';
