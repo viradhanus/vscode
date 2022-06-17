@@ -38,7 +38,6 @@ import { ITreeSorter } from 'vs/base/browser/ui/tree/tree';
 import { AbstractTreeViewState, IAbstractTreeViewState } from 'vs/base/browser/ui/tree/abstractTree';
 
 const _ctxFollowsCursor = new RawContextKey('outlineFollowsCursor', false);
-const _ctxFilterOnType = new RawContextKey('outlineFiltersOnType', false);
 const _ctxSortMode = new RawContextKey<OutlineSortOrder>('outlineSortMode', OutlineSortOrder.ByPosition);
 
 class OutlineTreeSorter<E> implements ITreeSorter<E> {
@@ -80,7 +79,6 @@ export class OutlinePane extends ViewPane {
 	private _treeStates = new LRUCache<string, IAbstractTreeViewState>(10);
 
 	private _ctxFollowsCursor!: IContextKey<boolean>;
-	private _ctxFilterOnType!: IContextKey<boolean>;
 	private _ctxSortMode!: IContextKey<OutlineSortOrder>;
 
 	constructor(
@@ -105,13 +103,11 @@ export class OutlinePane extends ViewPane {
 
 		contextKeyService.bufferChangeEvents(() => {
 			this._ctxFollowsCursor = _ctxFollowsCursor.bindTo(contextKeyService);
-			this._ctxFilterOnType = _ctxFilterOnType.bindTo(contextKeyService);
 			this._ctxSortMode = _ctxSortMode.bindTo(contextKeyService);
 		});
 
 		const updateContext = () => {
 			this._ctxFollowsCursor.set(this._outlineViewState.followCursor);
-			this._ctxFilterOnType.set(this._outlineViewState.filterOnType);
 			this._ctxSortMode.set(this._outlineViewState.sortBy);
 		};
 		updateContext();
@@ -259,7 +255,6 @@ export class OutlinePane extends ViewPane {
 				expandOnlyOnTwistieClick: true,
 				multipleSelectionSupport: false,
 				hideTwistiesOfChildlessElements: true,
-				filterOnType: this._outlineViewState.filterOnType,
 				overrideStyles: { listBackground: this.getBackgroundColor() }
 			}
 		);
@@ -294,9 +289,6 @@ export class OutlinePane extends ViewPane {
 			}
 		}));
 
-		// feature: filter on type - keep tree and menu in sync
-		this._editorControlDisposables.add(tree.onDidUpdateOptions(e => this._outlineViewState.filterOnType = Boolean(e.filterOnType)));
-
 		// feature: reveal outline selection in editor
 		// on change -> reveal/select defining range
 		this._editorControlDisposables.add(tree.onDidOpen(e => newOutline.reveal(e.element, e.editorOptions, e.sideBySide)));
@@ -327,9 +319,6 @@ export class OutlinePane extends ViewPane {
 		// feature: update view when user state changes
 		this._editorControlDisposables.add(this._outlineViewState.onDidChange((e: { followCursor?: boolean; sortBy?: boolean; filterOnType?: boolean }) => {
 			this._outlineViewState.persist(this._storageService);
-			if (e.filterOnType) {
-				tree.updateOptions({ filterOnType: this._outlineViewState.filterOnType });
-			}
 			if (e.followCursor) {
 				revealActiveElement();
 			}
@@ -342,9 +331,6 @@ export class OutlinePane extends ViewPane {
 		// feature: expand all nodes when filtering (not when finding)
 		let viewState: AbstractTreeViewState | undefined;
 		this._editorControlDisposables.add(tree.onDidChangeTypeFilterPattern(pattern => {
-			if (!tree.options.filterOnType) {
-				return;
-			}
 			if (!viewState && pattern) {
 				viewState = tree.getViewState();
 				tree.expandAll();
@@ -408,26 +394,27 @@ registerAction2(class FollowCursor extends ViewAction<OutlinePane> {
 	}
 });
 
-registerAction2(class FilterOnType extends ViewAction<OutlinePane> {
-	constructor() {
-		super({
-			viewId: OutlinePane.Id,
-			id: 'outline.filterOnType',
-			title: localize('filterOnType', "Filter on Type"),
-			f1: false,
-			toggled: _ctxFilterOnType,
-			menu: {
-				id: MenuId.ViewTitle,
-				group: 'config',
-				order: 2,
-				when: ContextKeyExpr.equals('view', OutlinePane.Id)
-			}
-		});
-	}
-	runInView(_accessor: ServicesAccessor, view: OutlinePane) {
-		view.outlineViewState.filterOnType = !view.outlineViewState.filterOnType;
-	}
-});
+// TODO@joao
+// registerAction2(class FilterOnType extends ViewAction<OutlinePane> {
+// 	constructor() {
+// 		super({
+// 			viewId: OutlinePane.Id,
+// 			id: 'outline.filterOnType',
+// 			title: localize('filterOnType', "Filter on Type"),
+// 			f1: false,
+// 			toggled: _ctxFilterOnType,
+// 			menu: {
+// 				id: MenuId.ViewTitle,
+// 				group: 'config',
+// 				order: 2,
+// 				when: ContextKeyExpr.equals('view', OutlinePane.Id)
+// 			}
+// 		});
+// 	}
+// 	runInView(_accessor: ServicesAccessor, view: OutlinePane) {
+// 		view.outlineViewState.filterOnType = !view.outlineViewState.filterOnType;
+// 	}
+// });
 
 
 registerAction2(class SortByPosition extends ViewAction<OutlinePane> {

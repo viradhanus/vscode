@@ -194,8 +194,7 @@ function asListOptions<T, TFilterData, TRef>(modelProvider: () => ITreeModel<T, 
 			getKeyboardNavigationLabel(node) {
 				return options.keyboardNavigationLabelProvider!.getKeyboardNavigationLabel(node.element);
 			}
-		},
-		enableKeyboardNavigation: options.simpleKeyboardNavigation
+		}
 	};
 }
 
@@ -579,7 +578,7 @@ class TypeFilter<T> implements ITreeFilter<T, FuzzyScore | LabelFuzzyScore>, IDi
 	}
 
 	constructor(
-		private tree: AbstractTree<T, any, any>,
+		tree: AbstractTree<T, any, any>,
 		private keyboardNavigationLabelProvider: IKeyboardNavigationLabelProvider<T>,
 		private _filter?: ITreeFilter<T, FuzzyScore>
 	) {
@@ -589,11 +588,6 @@ class TypeFilter<T> implements ITreeFilter<T, FuzzyScore | LabelFuzzyScore>, IDi
 	filter(element: T, parentVisibility: TreeVisibility): TreeFilterResult<FuzzyScore | LabelFuzzyScore> {
 		if (this._filter) {
 			const result = this._filter.filter(element, parentVisibility);
-
-			if (this.tree.options.simpleKeyboardNavigation) {
-				return result;
-			}
-
 			let visibility: TreeVisibility;
 
 			if (typeof result === 'boolean') {
@@ -611,7 +605,7 @@ class TypeFilter<T> implements ITreeFilter<T, FuzzyScore | LabelFuzzyScore>, IDi
 
 		this._totalCount++;
 
-		if (this.tree.options.simpleKeyboardNavigation || !this._pattern) {
+		if (!this._pattern) {
 			this._matchCount++;
 			return { data: FuzzyScore.Default, visibility: true };
 		}
@@ -634,11 +628,12 @@ class TypeFilter<T> implements ITreeFilter<T, FuzzyScore | LabelFuzzyScore>, IDi
 			}
 		}
 
-		if (this.tree.options.filterOnType) {
-			return TreeVisibility.Recurse;
-		} else {
-			return { data: FuzzyScore.Default, visibility: true };
-		}
+		// TODO@joao
+		// if (this.tree.options.filterOnType) {
+		return TreeVisibility.Recurse;
+		// } else {
+		// 	return { data: FuzzyScore.Default, visibility: true };
+		// }
 	}
 
 	private reset(): void {
@@ -647,330 +642,6 @@ class TypeFilter<T> implements ITreeFilter<T, FuzzyScore | LabelFuzzyScore>, IDi
 	}
 
 	dispose(): void {
-		dispose(this.disposables);
-	}
-}
-
-class TypeFilterController<T, TFilterData> implements IDisposable {
-
-	private _enabled = false;
-	get enabled(): boolean { return this._enabled; }
-
-	private _pattern = '';
-	get pattern(): string { return this._pattern; }
-
-	private _filterOnType: boolean;
-	get filterOnType(): boolean { return this._filterOnType; }
-
-	private _empty: boolean = false;
-	get empty(): boolean { return this._empty; }
-
-	private readonly _onDidChangeEmptyState = new Emitter<boolean>();
-	readonly onDidChangeEmptyState: Event<boolean> = Event.latch(this._onDidChangeEmptyState.event);
-
-	private positionClassName = 'ne';
-	private domNode: HTMLElement;
-	private messageDomNode: HTMLElement;
-	private labelDomNode: HTMLElement;
-	private filterOnTypeDomNode: HTMLInputElement;
-	private clearDomNode: HTMLElement;
-	private keyboardNavigationEventFilter?: IKeyboardNavigationEventFilter;
-
-	private automaticKeyboardNavigation = true;
-	private triggered = false;
-
-	private readonly _onDidChangePattern = new Emitter<string>();
-	readonly onDidChangePattern = this._onDidChangePattern.event;
-
-	private readonly enabledDisposables = new DisposableStore();
-	private readonly disposables = new DisposableStore();
-
-	constructor(
-		private tree: AbstractTree<T, TFilterData, any>,
-		model: ITreeModel<T, TFilterData, any>,
-		private view: List<ITreeNode<T, TFilterData>>,
-		private filter: TypeFilter<T>,
-		private keyboardNavigationDelegate: IKeyboardNavigationDelegate
-	) {
-		this.domNode = $(`.monaco-list-type-filter.${this.positionClassName}`);
-		this.domNode.draggable = true;
-		this.disposables.add(addDisposableListener(this.domNode, 'dragstart', () => this.onDragStart()));
-
-		this.messageDomNode = append(view.getHTMLElement(), $(`.monaco-list-type-filter-message`));
-
-		this.labelDomNode = append(this.domNode, $('span.label'));
-		const controls = append(this.domNode, $('.controls'));
-
-		this._filterOnType = !!tree.options.filterOnType;
-		this.filterOnTypeDomNode = append(controls, $<HTMLInputElement>('input.filter'));
-		this.filterOnTypeDomNode.type = 'checkbox';
-		this.filterOnTypeDomNode.checked = this._filterOnType;
-		this.filterOnTypeDomNode.tabIndex = -1;
-		this.updateFilterOnTypeTitleAndIcon();
-		this.disposables.add(addDisposableListener(this.filterOnTypeDomNode, 'input', () => this.onDidChangeFilterOnType()));
-
-		this.clearDomNode = append(controls, $<HTMLInputElement>('button.clear' + Codicon.treeFilterClear.cssSelector));
-		this.clearDomNode.tabIndex = -1;
-		this.clearDomNode.title = localize('clear', "Clear");
-
-		this.keyboardNavigationEventFilter = tree.options.keyboardNavigationEventFilter;
-
-		model.onDidSplice(this.onDidSpliceModel, this, this.disposables);
-		this.updateOptions(tree.options);
-	}
-
-	updateOptions(options: IAbstractTreeOptions<T, TFilterData>): void {
-		if (options.simpleKeyboardNavigation) {
-			this.disable();
-		} else {
-			this.enable();
-		}
-
-		if (typeof options.filterOnType !== 'undefined') {
-			this._filterOnType = !!options.filterOnType;
-			this.filterOnTypeDomNode.checked = this._filterOnType;
-			this.updateFilterOnTypeTitleAndIcon();
-		}
-
-		if (typeof options.automaticKeyboardNavigation !== 'undefined') {
-			this.automaticKeyboardNavigation = options.automaticKeyboardNavigation;
-		}
-
-		this.tree.refilter();
-		this.render();
-
-		if (!this.automaticKeyboardNavigation) {
-			this.onEventOrInput('');
-		}
-	}
-
-	toggle(): void {
-		this.triggered = !this.triggered;
-
-		if (!this.triggered) {
-			this.onEventOrInput('');
-		}
-	}
-
-	private enable(): void {
-		if (this._enabled) {
-			return;
-		}
-
-		const onRawKeyDown = this.enabledDisposables.add(new DomEmitter(this.view.getHTMLElement(), 'keydown'));
-		const onKeyDown = Event.chain(onRawKeyDown.event)
-			.filter(e => !isInputElement(e.target as HTMLElement) || e.target === this.filterOnTypeDomNode)
-			.filter(e => e.key !== 'Dead' && !/^Media/.test(e.key))
-			.map(e => new StandardKeyboardEvent(e))
-			.filter(this.keyboardNavigationEventFilter || (() => true))
-			.filter(() => this.automaticKeyboardNavigation || this.triggered)
-			.filter(e => (this.keyboardNavigationDelegate.mightProducePrintableCharacter(e) && !(e.keyCode === KeyCode.DownArrow || e.keyCode === KeyCode.UpArrow || e.keyCode === KeyCode.LeftArrow || e.keyCode === KeyCode.RightArrow)) || ((this.pattern.length > 0 || this.triggered) && ((e.keyCode === KeyCode.Escape || e.keyCode === KeyCode.Backspace) && !e.altKey && !e.ctrlKey && !e.metaKey) || (e.keyCode === KeyCode.Backspace && (isMacintosh ? (e.altKey && !e.metaKey) : e.ctrlKey) && !e.shiftKey)))
-			.forEach(e => { e.stopPropagation(); e.preventDefault(); })
-			.event;
-
-		const onClearClick = this.enabledDisposables.add(new DomEmitter(this.clearDomNode, 'click'));
-
-		Event.chain(Event.any<MouseEvent | StandardKeyboardEvent>(onKeyDown, onClearClick.event))
-			.event(this.onEventOrInput, this, this.enabledDisposables);
-
-		this.filter.pattern = '';
-		this.tree.refilter();
-		this.render();
-		this._enabled = true;
-		this.triggered = false;
-	}
-
-	private disable(): void {
-		if (!this._enabled) {
-			return;
-		}
-
-		this.domNode.remove();
-		this.enabledDisposables.clear();
-		this.tree.refilter();
-		this.render();
-		this._enabled = false;
-		this.triggered = false;
-	}
-
-	private onEventOrInput(e: MouseEvent | StandardKeyboardEvent | string): void {
-		if (typeof e === 'string') {
-			this.onInput(e);
-		} else if (e instanceof MouseEvent || e.keyCode === KeyCode.Escape || (e.keyCode === KeyCode.Backspace && (isMacintosh ? e.altKey : e.ctrlKey))) {
-			this.onInput('');
-		} else if (e.keyCode === KeyCode.Backspace) {
-			this.onInput(this.pattern.length === 0 ? '' : this.pattern.substr(0, this.pattern.length - 1));
-		} else {
-			this.onInput(this.pattern + e.browserEvent.key);
-		}
-	}
-
-	private onInput(pattern: string): void {
-		const container = this.view.getHTMLElement();
-
-		if (pattern && !this.domNode.parentElement) {
-			container.append(this.domNode);
-		} else if (!pattern && this.domNode.parentElement) {
-			this.domNode.remove();
-			this.tree.domFocus();
-		}
-
-		this._pattern = pattern;
-		this._onDidChangePattern.fire(pattern);
-
-		this.filter.pattern = pattern;
-		this.tree.refilter();
-
-		if (pattern) {
-			this.tree.focusNext(0, true, undefined, node => !FuzzyScore.isDefault(node.filterData as any as FuzzyScore));
-		}
-
-		const focus = this.tree.getFocus();
-
-		if (focus.length > 0) {
-			const element = focus[0];
-
-			if (this.tree.getRelativeTop(element) === null) {
-				this.tree.reveal(element, 0.5);
-			}
-		}
-
-		this.render();
-
-		if (!pattern) {
-			this.triggered = false;
-		}
-	}
-
-	private onDragStart(): void {
-		const container = this.view.getHTMLElement();
-		const { left } = getDomNodePagePosition(container);
-		const containerWidth = container.clientWidth;
-		const midContainerWidth = containerWidth / 2;
-		const width = this.domNode.clientWidth;
-		const disposables = new DisposableStore();
-		let positionClassName = this.positionClassName;
-
-		const updatePosition = () => {
-			switch (positionClassName) {
-				case 'nw':
-					this.domNode.style.top = `4px`;
-					this.domNode.style.left = `4px`;
-					break;
-				case 'ne':
-					this.domNode.style.top = `4px`;
-					this.domNode.style.left = `${containerWidth - width - 6}px`;
-					break;
-			}
-		};
-
-		const onDragOver = (event: DragEvent) => {
-			event.preventDefault(); // needed so that the drop event fires (https://stackoverflow.com/questions/21339924/drop-event-not-firing-in-chrome)
-
-			const x = event.clientX - left;
-			if (event.dataTransfer) {
-				event.dataTransfer.dropEffect = 'none';
-			}
-
-			if (x < midContainerWidth) {
-				positionClassName = 'nw';
-			} else {
-				positionClassName = 'ne';
-			}
-
-			updatePosition();
-		};
-
-		const onDragEnd = () => {
-			this.positionClassName = positionClassName;
-			this.domNode.className = `monaco-list-type-filter ${this.positionClassName}`;
-			this.domNode.style.top = '';
-			this.domNode.style.left = '';
-
-			dispose(disposables);
-		};
-
-		updatePosition();
-		this.domNode.classList.remove(positionClassName);
-
-		this.domNode.classList.add('dragging');
-		disposables.add(toDisposable(() => this.domNode.classList.remove('dragging')));
-
-		disposables.add(addDisposableListener(document, 'dragover', e => onDragOver(e)));
-		disposables.add(addDisposableListener(this.domNode, 'dragend', () => onDragEnd()));
-
-		StaticDND.CurrentDragAndDropData = new DragAndDropData('vscode-ui');
-		disposables.add(toDisposable(() => StaticDND.CurrentDragAndDropData = undefined));
-	}
-
-	private onDidSpliceModel(): void {
-		if (!this._enabled || this.pattern.length === 0) {
-			return;
-		}
-
-		this.tree.refilter();
-		this.render();
-	}
-
-	private onDidChangeFilterOnType(): void {
-		this.tree.updateOptions({ filterOnType: this.filterOnTypeDomNode.checked });
-		this.tree.refilter();
-		this.tree.domFocus();
-		this.render();
-		this.updateFilterOnTypeTitleAndIcon();
-	}
-
-	private updateFilterOnTypeTitleAndIcon(): void {
-		if (this.filterOnType) {
-			this.filterOnTypeDomNode.classList.remove(...Codicon.treeFilterOnTypeOff.classNamesArray);
-			this.filterOnTypeDomNode.classList.add(...Codicon.treeFilterOnTypeOn.classNamesArray);
-			this.filterOnTypeDomNode.title = localize('disable filter on type', "Disable Filter on Type");
-		} else {
-			this.filterOnTypeDomNode.classList.remove(...Codicon.treeFilterOnTypeOn.classNamesArray);
-			this.filterOnTypeDomNode.classList.add(...Codicon.treeFilterOnTypeOff.classNamesArray);
-			this.filterOnTypeDomNode.title = localize('enable filter on type', "Enable Filter on Type");
-		}
-	}
-
-	private render(): void {
-		const noMatches = this.filter.totalCount > 0 && this.filter.matchCount === 0;
-
-		if (this.pattern && this.tree.options.filterOnType && noMatches) {
-			this.messageDomNode.textContent = localize('empty', "No elements found");
-			this._empty = true;
-		} else {
-			this.messageDomNode.innerText = '';
-			this._empty = false;
-		}
-
-		this.domNode.classList.toggle('no-matches', noMatches);
-		this.domNode.title = localize('found', "Matched {0} out of {1} elements", this.filter.matchCount, this.filter.totalCount);
-		this.labelDomNode.textContent = this.pattern.length > 16 ? '…' + this.pattern.substr(this.pattern.length - 16) : this.pattern;
-
-		this._onDidChangeEmptyState.fire(this._empty);
-	}
-
-	shouldAllowFocus(node: ITreeNode<T, TFilterData>): boolean {
-		if (!this.enabled || !this.pattern || this.filterOnType) {
-			return true;
-		}
-
-		if (this.filter.totalCount > 0 && this.filter.matchCount <= 1) {
-			return true;
-		}
-
-		return !FuzzyScore.isDefault(node.filterData as any as FuzzyScore);
-	}
-
-	dispose() {
-		if (this._enabled) {
-			this.domNode.remove();
-			this.enabledDisposables.dispose();
-			this._enabled = false;
-			this.triggered = false;
-		}
-
-		this._onDidChangePattern.dispose();
 		dispose(this.disposables);
 	}
 }
@@ -1005,9 +676,6 @@ export interface IKeyboardNavigationEventFilter {
 
 export interface IAbstractTreeOptionsUpdate extends ITreeRendererOptions {
 	readonly multipleSelectionSupport?: boolean;
-	readonly automaticKeyboardNavigation?: boolean;
-	readonly simpleKeyboardNavigation?: boolean;
-	readonly filterOnType?: boolean;
 	readonly smoothScrolling?: boolean;
 	readonly horizontalScrolling?: boolean;
 	readonly mouseWheelScrollSensitivity?: number;
@@ -1316,7 +984,6 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 	private selection: Trait<T>;
 	private anchor: Trait<T>;
 	private eventBufferer = new EventBufferer();
-	private typeFilterController?: TypeFilterController<T, TFilterData>;
 	private focusNavigationFilter: ((node: ITreeNode<T, TFilterData>) => boolean) | undefined;
 	private styleElement: HTMLStyleElement;
 	protected readonly disposables = new DisposableStore();
@@ -1346,8 +1013,8 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 	private readonly _onWillRefilter = new Emitter<void>();
 	readonly onWillRefilter: Event<void> = this._onWillRefilter.event;
 
-	get filterOnType(): boolean { return !!this._options.filterOnType; }
-	get onDidChangeTypeFilterPattern(): Event<string> { return this.typeFilterController ? this.typeFilterController.onDidChangePattern : Event.None; }
+	// TODO@joao
+	get onDidChangeTypeFilterPattern(): Event<string> { return Event.None; }
 
 	get expandOnDoubleClick(): boolean { return typeof this._options.expandOnDoubleClick === 'undefined' ? true : this._options.expandOnDoubleClick; }
 	get expandOnlyOnTwistieClick(): boolean | ((e: T) => boolean) { return typeof this._options.expandOnlyOnTwistieClick === 'undefined' ? true : this._options.expandOnlyOnTwistieClick; }
@@ -1430,12 +1097,13 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 			onKeyDown.filter(e => e.keyCode === KeyCode.Space).on(this.onSpace, this, this.disposables);
 		}
 
-		if (_options.keyboardNavigationLabelProvider) {
-			const delegate = _options.keyboardNavigationDelegate || DefaultKeyboardNavigationDelegate;
-			this.typeFilterController = new TypeFilterController(this, this.model, this.view, filter!, delegate);
-			this.focusNavigationFilter = node => this.typeFilterController!.shouldAllowFocus(node);
-			this.disposables.add(this.typeFilterController!);
-		}
+		// TODO@joao
+		// if (_options.keyboardNavigationLabelProvider) {
+		// 	const delegate = _options.keyboardNavigationDelegate || DefaultKeyboardNavigationDelegate;
+		// 	this.typeFilterController = new TypeFilterController(this, this.model, this.view, filter!, delegate);
+		// 	this.focusNavigationFilter = node => this.typeFilterController!.shouldAllowFocus(node);
+		// 	this.disposables.add(this.typeFilterController!);
+		// }
 
 		this.styleElement = createStyleSheet(this.view.getHTMLElement());
 		this.getHTMLElement().classList.toggle('always', this._options.renderIndentGuides === RenderIndentGuides.Always);
@@ -1448,12 +1116,10 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 			renderer.updateOptions(optionsUpdate);
 		}
 
-		this.view.updateOptions({
-			...this._options,
-			enableKeyboardNavigation: this._options.simpleKeyboardNavigation,
-		});
+		this.view.updateOptions(this._options);
 
-		this.typeFilterController?.updateOptions(this._options);
+		// TODO@joao
+		// this.typeFilterController?.updateOptions(this._options);
 
 		this._onDidUpdateOptions.fire(this._options);
 
@@ -1481,19 +1147,21 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 	}
 
 	get contentHeight(): number {
-		if (this.typeFilterController && this.typeFilterController.filterOnType && this.typeFilterController.empty) {
-			return 100;
-		}
+		// TODO@joao
+		// if (this.typeFilterController && this.typeFilterController.filterOnType && this.typeFilterController.empty) {
+		// 	return 100;
+		// }
 
 		return this.view.contentHeight;
 	}
 
 	get onDidChangeContentHeight(): Event<number> {
-		let result = this.view.onDidChangeContentHeight;
+		const result = this.view.onDidChangeContentHeight;
 
-		if (this.typeFilterController) {
-			result = Event.any(result, Event.map(this.typeFilterController.onDidChangeEmptyState, () => this.contentHeight));
-		}
+		// TODO@joao
+		// if (this.typeFilterController) {
+		// 	result = Event.any(result, Event.map(this.typeFilterController.onDidChangeEmptyState, () => this.contentHeight));
+		// }
 
 		return result;
 	}
@@ -1624,10 +1292,6 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 
 	toggleKeyboardNavigation(): void {
 		this.view.toggleKeyboardNavigation();
-
-		if (this.typeFilterController) {
-			this.typeFilterController.toggle();
-		}
 	}
 
 	refilter(): void {

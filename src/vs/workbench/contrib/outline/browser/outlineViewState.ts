@@ -16,10 +16,9 @@ export const enum OutlineSortOrder {
 export class OutlineViewState {
 
 	private _followCursor = false;
-	private _filterOnType = true;
 	private _sortBy = OutlineSortOrder.ByPosition;
 
-	private readonly _onDidChange = new Emitter<{ followCursor?: boolean; sortBy?: boolean; filterOnType?: boolean }>();
+	private readonly _onDidChange = new Emitter<{ followCursor?: boolean; sortBy?: boolean }>();
 	readonly onDidChange = this._onDidChange.event;
 
 	dispose(): void {
@@ -37,17 +36,6 @@ export class OutlineViewState {
 		return this._followCursor;
 	}
 
-	get filterOnType() {
-		return this._filterOnType;
-	}
-
-	set filterOnType(value) {
-		if (value !== this._filterOnType) {
-			this._filterOnType = value;
-			this._onDidChange.fire({ filterOnType: true });
-		}
-	}
-
 	set sortBy(value: OutlineSortOrder) {
 		if (value !== this._sortBy) {
 			this._sortBy = value;
@@ -63,7 +51,6 @@ export class OutlineViewState {
 		storageService.store('outline/state', JSON.stringify({
 			followCursor: this.followCursor,
 			sortBy: this.sortBy,
-			filterOnType: this.filterOnType,
 		}), StorageScope.WORKSPACE, StorageTarget.USER);
 	}
 
@@ -80,8 +67,5 @@ export class OutlineViewState {
 		}
 		this.followCursor = data.followCursor;
 		this.sortBy = data.sortBy ?? OutlineSortOrder.ByPosition;
-		if (typeof data.filterOnType === 'boolean') {
-			this.filterOnType = data.filterOnType;
-		}
 	}
 }

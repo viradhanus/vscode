@@ -586,10 +586,6 @@ export class LoadedScriptsView extends ViewPane {
 		// feature: expand all nodes when filtering (not when finding)
 		let viewState: IViewState | undefined;
 		this._register(this.tree.onDidChangeTypeFilterPattern(pattern => {
-			if (!this.tree.options.filterOnType) {
-				return;
-			}
-
 			if (!viewState && pattern) {
 				const expanded = new Set<string>();
 				const visit = (node: ITreeNode<BaseTreeItem | null, FuzzyScore>) => {

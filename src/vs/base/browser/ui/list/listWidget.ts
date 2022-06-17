@@ -390,7 +390,6 @@ class TypeLabelController<T> implements IDisposable {
 	private enabled = false;
 	private state: TypeLabelControllerState = TypeLabelControllerState.Idle;
 
-	private automaticKeyboardNavigation = true;
 	private triggered = false;
 	private previouslyFocused = -1;
 
@@ -403,21 +402,8 @@ class TypeLabelController<T> implements IDisposable {
 		private keyboardNavigationLabelProvider: IKeyboardNavigationLabelProvider<T>,
 		private delegate: IKeyboardNavigationDelegate
 	) {
-		this.updateOptions(list.options);
-	}
-
-	updateOptions(options: IListOptions<T>): void {
-		const enableKeyboardNavigation = typeof options.enableKeyboardNavigation === 'undefined' ? true : !!options.enableKeyboardNavigation;
-
-		if (enableKeyboardNavigation) {
-			this.enable();
-		} else {
-			this.disable();
-		}
-
-		if (typeof options.automaticKeyboardNavigation !== 'undefined') {
-			this.automaticKeyboardNavigation = options.automaticKeyboardNavigation;
-		}
+		// TODO@joao
+		this.enable();
 	}
 
 	toggle(): void {
@@ -431,7 +417,8 @@ class TypeLabelController<T> implements IDisposable {
 
 		const onChar = this.enabledDisposables.add(Event.chain(this.enabledDisposables.add(new DomEmitter(this.view.domNode, 'keydown')).event))
 			.filter(e => !isInputElement(e.target as HTMLElement))
-			.filter(() => this.automaticKeyboardNavigation || this.triggered)
+			// TODO@joao
+			// .filter(() => this.triggered)
 			.map(event => new StandardKeyboardEvent(event))
 			.filter(e => this.delegate.mightProducePrintableCharacter(e))
 			.forEach(e => e.preventDefault())
@@ -448,6 +435,7 @@ class TypeLabelController<T> implements IDisposable {
 		this.triggered = false;
 	}
 
+	// TODO@joao: remove
 	private disable(): void {
 		if (!this.enabled) {
 			return;
@@ -913,8 +901,6 @@ export class DefaultStyleController implements IStyleController {
 }
 
 export interface IListOptionsUpdate extends IListViewOptionsUpdate {
-	readonly enableKeyboardNavigation?: boolean;
-	readonly automaticKeyboardNavigation?: boolean;
 	readonly multipleSelectionSupport?: boolean;
 }
 
@@ -1389,8 +1375,6 @@ export class List<T> implements ISpliceable<T>, IThemable, IDisposable {
 
 	updateOptions(optionsUpdate: IListOptionsUpdate = {}): void {
 		this._options = { ...this._options, ...optionsUpdate };
-
-		this.typeLabelController?.updateOptions(this._options);
 
 		if (this._options.multipleSelectionController !== undefined) {
 			if (this._options.multipleSelectionSupport) {

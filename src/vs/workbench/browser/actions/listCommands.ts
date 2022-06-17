@@ -614,24 +614,6 @@ CommandsRegistry.registerCommand({
 	}
 });
 
-CommandsRegistry.registerCommand({
-	id: 'list.toggleFilterOnType',
-	handler: (accessor) => {
-		const focused = accessor.get(IListService).lastFocusedList;
-
-		// List
-		if (focused instanceof List || focused instanceof PagedList || focused instanceof Table) {
-			// TODO@joao
-		}
-
-		// Tree
-		else if (focused instanceof ObjectTree || focused instanceof DataTree || focused instanceof AsyncDataTree) {
-			const tree = focused;
-			tree.updateOptions({ filterOnType: !tree.filterOnType });
-		}
-	}
-});
-
 KeybindingsRegistry.registerCommandAndKeybindingRule({
 	id: 'list.scrollUp',
 	weight: KeybindingWeight.WorkbenchContrib,
