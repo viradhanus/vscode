@@ -1,0 +1,27 @@
+name: Security Status Monitoring
+
+# Controls when the workflow will run
+on:
+  # Trigger on workflow run
+  workflow_run : 
+    workflows : ["Code Scanning"]
+    types : [ completed]
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  update_db:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - uses: ESLE-Org/example-javascript-action@v0.6
+        with:
+          githubToken: ${{secrets.GITHUB_TOKEN}}
+          db_endpoint: ${{secrets.COSMOS_DB_BASE_URL}}
+          db_key: ${{secrets.COSMOS_DB_PRIMARY_KEY}}
+      # Use the output from the `hello` step
+      - name: Get the output time
+        run: echo "The time was ${{ steps.hello.outputs.time }}"
